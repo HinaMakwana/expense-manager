@@ -7,18 +7,31 @@
 module.exports = {
 
   attributes: {
+
     name : {
       type : 'string',
       required : true
     },
-    /* user : {
-      model : 'User',
-      required : true
-    } */
     user : {
+      model : 'user'
+    },
+    balance : {
+      type : 'float',
+      defaultsTo : 0.0
+    },
+    users : {
       collection : 'user',
-      via : 'owner'
+      via : 'accountId',
+      through : 'member'
+    },
+    isDeleted : {
+      type : 'boolean',
+      defaultsTo : false
     }
+  },
+
+  validate : async function(req) {
+    req.check('name').exists().withMessage('name is required')
   }
 
 };

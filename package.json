@@ -14,7 +14,9 @@
     "sails": "^1.5.4",
     "sails-custom-validation-messages": "^0.0.1",
     "sails-hook-orm": "^4.0.0",
+    "sails-hook-req-validate": "^2.8.4",
     "sails-hook-sockets": "^2.0.0",
+    "sails-hook-validation-ev": "^0.0.2",
     "sails-mongo": "^2.0.0"
   },
   "devDependencies": {

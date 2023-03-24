@@ -10,10 +10,13 @@
 
 module.exports.policies = {
   UserController : {
-    logout : "isAuthorized",
+    logout : 'isAuthorized',
   },
   AccountController : {
      '*' : 'isAuthorized'
+  },
+  TransactionController : {
+    '*' : 'isAuthorized'
   }
 
   /***************************************************************************

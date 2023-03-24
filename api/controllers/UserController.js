@@ -6,18 +6,16 @@
  */
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+var validate = require('sails-hook-validation-ev/lib/validate');
 
 module.exports = {
   //user signup
   signup: async (req,res) =>{
-    /** testing account */
-    let transport = nodemailer.createTransport({
-        host: "sandbox.smtp.mailtrap.io",
-        port: 2525,
-        auth: { user: "f92a35a294cae1", pass: "11e4263e3c726e" }
-      });
-
+    validate(req)
+    const errors = await req.getValidationResult();
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array()[0].msg });
+    }
     const {name, email, password} = req.body;
     let userFind = await User.findOne({email : email});
     if(userFind){
@@ -25,7 +23,6 @@ module.exports = {
             message : 'User already exist'
         })
     } else {
-        if(password.length >= 8){
             let hash = await bcrypt.hash(password, 10);
             let user = {
                 name : name,
@@ -33,31 +30,12 @@ module.exports = {
                 password : hash
             }
             let createUser = await User.create(user).fetch();
-            let message  = {
-                from : '"zignuts" <zignuts@gmail.com>',
-                to : createUser.email,
-                subject : "testing",
-                text : "Hello",
-                html : "<b>Welcome to zignuts</b>"
-            }
-            transport.sendMail(message).then(()=>{
-                return res.status(200).json({
-                    user : createUser,
-                    message : 'receive mail'
-                });
-            }).catch(err=>{
-                res.status(500).json({
-                    error : err
-                })
-            })
-            const account = {
-                name : name,
-                user : createUser.id
-            }
-            let createAccount = await Account.create(account);
-            } else {
-                res.send('enter minimum 8 character long password')
-            }
+            await sails.helpers.sendMail(email,name);
+            await sails.models.user.defaultAccount(name,email);
+            return res.status(200).json({
+                user : createUser,
+                message : 'receive mail'
+            });
         }
   },
   //user login
@@ -87,7 +65,7 @@ module.exports = {
                 res.status(500).send('Database Error')
             }
         } else {
-            res.status(404).json({
+            res.status(400).json({
                 message : 'Password is invalid'
             })
         }
