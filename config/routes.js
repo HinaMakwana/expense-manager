@@ -13,11 +13,12 @@ module.exports.routes = {
     'POST /user/signup' : 'UserController.signup',
     'POST /user/login' : 'UserController.login',
     'POST /user/logout' : 'UserController.logout',
+    'GET /profile' : 'UserController.profile',
 
     //account controller routes
     'POST /account/add' : 'AccountController.add',
     'GET /account/list' : 'AccountController.list',
-    'DELETE /account/delete' : 'AccountController.delete',
+    'DELETE /account/delete' : 'AccountController.deleteAccount',
     'PATCH /account/update' : 'AccountController.update',
     'POST /member/add' : 'AccountController.addMember',
 

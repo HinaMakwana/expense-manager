@@ -4,22 +4,35 @@
  * @description :: A model definition represents a database table/collection.
  * @docs        :: https://sailsjs.com/docs/concepts/models-and-orm/models
  */
-
+let validateData = sails.config.constant.validation.User;
+let Validator = sails.config.constant.Validator;
+let id = sails.config.constant;
 module.exports = {
   attributes: {
 
    name : {
-    type : 'string'
+    type : 'string',
+    required: true
    },
    email: {
     type : 'string',
-    isEmail : true
+    isEmail : true,
+    required: true
    },
    password: {
     type : 'string',
     minLength : 8,
+    required: true
    },
-   token : { type : 'string'},
+   token : {
+    type : 'string',
+    allowNull : true
+  },
+   isDeleted : {
+    type : 'boolean',
+    defaultsTo : false
+   },
+   //through association
    member : {
     collection : 'account',
     via : 'memberId',
@@ -29,22 +42,42 @@ module.exports = {
 
   defaultAccount : async function(attribute1,attribute2) {
       let findUser = await User.findOne({email : attribute2});
-      if(findUser){
-        const account = {
-          name : attribute1,
-          user : findUser.id,
-          createdBy : findUser.id,
-          createdAt : new Date().getTime()
-        }
-        let createAccount = await Account.create(account);
-        console.log('account create');
+      if(!findUser){
+        return false
       }
+      const account = {
+        id: id.uuid(),
+        name : attribute1,
+        user : findUser.id,
+        createdBy : findUser.id,
+        createdAt : new Date().getTime()
+      }
+      let createAcc = await Account.create(account).fetch();
+      console.log('account create');
+      return createAcc
   },
-  validate : async function(req) {
-   req.check('name').exists().withMessage('name is required')
-   req.check('email').exists().withMessage('email is required')
-   req.check('email').exists().isEmail().withMessage('enter valid email')
-   req.check('password').exists().withMessage('password is required')
-   req.check('password').exists().isLength({ min : 8 }).withMessage('must be at least 8 character long')
+  validate : async function(data) {
+    let requiredRules = Object.keys(validateData).filter((key)=> {
+      if(Object.keys(data).indexOf(key)>= 0) {
+        return key
+      }
+    })
+    let rules = {};
+    requiredRules.forEach((val)=> {
+      rules[val] = validateData[val]
+    })
+    let validate = new Validator(data,rules)
+    let result = {}
+    if(validate.passes()){
+      console.log('validate success');
+      result['hasError'] = false
+      return data
+    }
+    if(validate.fails()) {
+      console.log(1);
+      result['hasError'] = true
+      result['error'] = validate.errors.all()
+    }
+    return result
   }
 };

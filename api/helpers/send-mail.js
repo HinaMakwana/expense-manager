@@ -29,7 +29,7 @@ module.exports = {
     let transport = nodemailer.createTransport({
       host: "sandbox.smtp.mailtrap.io",
       port: 2525,
-      auth: { user: "f92a35a294cae1", pass: "11e4263e3c726e" }
+      auth: { user: process.env.AUTH, pass: process.env.PASS }
     });
     let message  = {
       from : '"zignuts" <zignuts@gmail.com>',

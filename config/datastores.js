@@ -51,8 +51,8 @@ module.exports.datastores = {
     // adapter: 'sails-mysql',
     // url: 'mysql://user:password@host:port/database',
 
-    adapter: 'sails-mongo',
-    url: 'mongodb://hinamak:VY7Iavm6iu5q1Asr8toi@15.206.7.200:28017/hinamak?authMechanism=DEFAULT&authSource=admin'
+    adapter: 'sails-postgresql',
+    url: process.env.DB_URL
 
   },
 

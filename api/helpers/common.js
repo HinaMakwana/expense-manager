@@ -30,14 +30,24 @@ module.exports = {
   },
 
   fn: async function (inputs) {
-    let findAccount = await Account.findOne({  id : inputs.accId, user: inputs.user, isDeleted : false });
+    let findAccount = await Account.findOne({
+      id : inputs.accId,
+      user: inputs.user,
+      isDeleted : false
+    });
     if(!findAccount) {
-        let findMember = await Member.findOne({ accountId : inputs.accId, memberId : inputs.user, isDeleted : false})
+        let findMember = await Member.findOne({
+          accountId : inputs.accId,
+          memberId : inputs.user,
+          isDeleted : false
+        })
         if(findMember) {
-            findAccount = await Account.findOne({ id : inputs.accId, isDeleted : false})
+            findAccount = await Account.findOne({
+              id : inputs.accId,
+              isDeleted : false
+            })
         }
     }
-    console.log(findAccount);
     return findAccount;
   }
 };

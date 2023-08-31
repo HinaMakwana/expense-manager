@@ -4,139 +4,268 @@
  * @description :: Server-side actions for handling incoming requests.
  * @help        :: See https://sailsjs.com/docs/concepts/actions
  */
-var validate = require('sails-hook-validation-ev/lib/validate');
+
+let id = sails.config.constant.uuid;
+let type = sails.config.constant.transactionType;
+let httpStatus = sails.config.constant.HttpStatusCode;
 
 module.exports = {
 
-    //add transaction
+    /**
+     *
+     * @param {Request} req
+     * @param {Response} res
+     * @description add transaction
+     * @route (POST /transaction/add)
+     */
     addTransaction : async (req,res)=> {
-        validate(req,res)
-        const errors = await req.getValidationResult();
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array()[0].msg});
-        }
-        const user =req.userData.userId;
-        const { account, transactionType, date, description, amount} = req.body
-        const findAccount = await sails.helpers.common(account,user);
-        if(!findAccount){
-            return res.status(404).send('account not found')
-        }
-        const newDate = await Transaction.checkDate(date);
-        let data = {
-                        account : account,
-                        transactionType : transactionType,
-                        date : newDate.date,
-                        description : description,
-                        amount  : amount,
-                        createdAt : new Date().getTime(),
-                        createdBy : user
-                    }
-        if(newDate.msg == 'done') {
-            let balance,addTransaction;
-            if(transactionType == 'i') {
-                addTransaction = await Transaction.create(data).fetch();
-                balance = findAccount.balance + addTransaction.amount
-            } else {
-                if(findAccount.balance > amount){
-                    addTransaction = await Transaction.create(data).fetch();
-                    balance = findAccount.balance - addTransaction.amount
-                } else {
-                    return res.status(400).json({
-                        message : 'Account balance is low'
-                    })
-                }
-            }
-            let changeAccount = await Account.updateOne({id : account, user: findAccount.user},{balance : balance})
-            res.status(200).json({
-                message : 'Transaction added successfully',
-                transaction : addTransaction
+        try {
+            const user =req.userData.userId;
+            const {
+                account,
+                transactionType,
+                date,
+                description,
+                amount
+            } = req.body;
+            let result = await Transaction.validate({
+                account,
+                transactionType,
+                date,
+                description,
+                amount
             })
-        } else {
-            res.status(300).json({
-                message : newDate.msg
-            })
-        }
-    },
-    //list all transaction in latest transaction
-    listTransaction : async (req,res)=> {
-        const user =req.userData.userId;
-        const { account }= req.body
-        const findAccount = await sails.helpers.common(account,user);
-        if(findAccount){
-            let listTransaction = await Transaction.find({account : account, isDeleted : false}).sort('date DESC');
-            if(listTransaction) {
-                res.status(200).json({
-                    message : 'Transaction of account ' + account,
-                    count : listTransaction.length,
-                    transactions : listTransaction
+            if(result.hasError) {
+                return res.status(httpStatus.BAD_REQUEST).json({
+                    message: 'validation error',
+                    error: result.error
                 })
             }
-        } else {
-            res.status(404).json({
-                message : 'account is invalid'
+            const findAccount = await sails.helpers.common(account,user);
+            if(!findAccount){
+                return res.status(httpStatus.NOT_FOUND).json({
+                    message: 'account not found'
+                })
+            }
+            const newDate = await Transaction.checkDate(date);
+            let data = {
+                id: id(),
+                account : account,
+                transactionType : transactionType,
+                date : newDate.date,
+                description : description,
+                amount  : amount,
+                createdAt : new Date().getTime(),
+                createdBy : user
+            }
+            if(newDate.msg === 'done') {
+                let balance,addTransaction;
+                if(transactionType === type.i) {
+                    addTransaction = await Transaction.create(data).fetch();
+                    balance = findAccount.balance + addTransaction.amount
+                }
+                if(transactionType === type.e) {
+                    if(findAccount.balance > amount){
+                        addTransaction = await Transaction.create(data).fetch();
+                        balance = findAccount.balance - addTransaction.amount
+                    } else {
+                        return res.status(httpStatus.BAD_REQUEST).json({
+                            message : 'Account balance is low'
+                        })
+                    }
+                }
+                await Account.updateOne({
+                    id : account,
+                    user: findAccount.user
+                },{balance : balance})
+                return res.status(httpStatus.OK).json({
+                    message : 'Transaction added successfully',
+                    transaction : addTransaction
+                })
+            } else {
+                return res.status(httpStatus.UNAUTHORIZED).json({
+                    message : newDate.msg
+                })
+            }
+        } catch (error) {
+            return res.status(httpStatus.SERVER_ERROR).json({
+                message: 'server error ' + error
             })
         }
     },
-    //delete transaction
+    /**
+     *
+     * @param {Request} req
+     * @param {Response} res
+     * @description list all transaction in latest transaction
+     * @route (POST /transaction/list)
+     */
+    listTransaction : async (req,res)=> {
+        try {
+            const user =req.userData.userId;
+            const { account }= req.body;
+            const findAccount = await sails.helpers.common(account,user);
+            if(!findAccount){
+                return res.status(httpStatus.NOT_FOUND).json({
+                    message : 'account is invalid'
+                })
+            }
+            let listTransaction = await Transaction.find({
+                account : account,
+                isDeleted : false
+            })
+            .sort('date DESC');
+            if(!listTransaction[0]) {
+                return res.status(httpStatus.NOT_FOUND).json({
+                    message: 'Not found any transaction'
+                })
+            }
+            return res.status(httpStatus.OK).json({
+                message : 'Transaction of account ' + account,
+                count : listTransaction.length,
+                transactions : listTransaction
+            })
+        } catch (error) {
+            return res.status(httpStatus.SERVER_ERROR).json({
+                message: 'server error ' + error
+            })
+        }
+
+    },
+    /**
+     *
+     * @param {Request} req
+     * @param {Response} res
+     * @description delete transaction
+     * @route (DELETE /transaction/delete)
+     */
     deleteTransaction : async (req,res)=> {
-        const user =req.userData.userId;
-        const { transactionId } = req.body
-        let findTrans = await Transaction.findOne({id : transactionId, isDeleted : false})
-        if(findTrans) {
+        try {
+            const user =req.userData.userId;
+            const { transactionId } = req.body;
+            let findTrans = await Transaction.findOne({
+                id : transactionId,
+                isDeleted : false
+            })
+            if(!findTrans) {
+                return res.status(httpStatus.NOT_FOUND).json({
+                    message: 'Invalid transaciton'
+                })
+            }
             const findAccount = await sails.helpers.common(findTrans.account,user);
             if(!findAccount) {
-              return  res.status(304).send('only member and owner can delete transaction')
+                return res.status(httpStatus.NOT_FOUND).json({
+                    message: 'only member and owner can delete transaction'
+                })
             }
             let balance;
-            if(findTrans.transactionType == 'e') {
+            if(findTrans.transactionType === type.e) {
                 balance = findAccount.balance + findTrans.amount
-            } else {
+            }
+            if(findTrans.transactionType === type.i) {
                 if(findAccount.balance > findTrans.amount) {
                     balance = findAccount.balance - findTrans.amount
                 } else {
-                   return res.status(300).send('transaction is not delete because account balance is not sufficient');
+                    return res.status(httpStatus.UNAUTHORIZED).json({
+                       message: 'transaction is not delete because account balance is not sufficient'
+                    });
                 }
             }
-            const deleteTrans = await Transaction.updateOne({id : transactionId},{ isDeleted : true, deletedAt : new Date().getTime(), deletedBy : user})
-            const updateAccount = await Account.updateOne({ id : findTrans.account}, { balance : balance })
-                res.status(200).json({
-                    message : 'Transaction deleted successfully',
-                    deleteTransaction : deleteTrans
-                })
-        } else {
-            return res.status(404).send('Transaction id is invalid')
+
+            const deleteTrans = await Transaction.updateOne({
+                id : transactionId,
+                isDeleted: false
+            },{
+                isDeleted : true,
+                deletedAt : new Date().getTime(),
+                deletedBy : user
+            })
+            await Account.updateOne({
+                id : findTrans.account,
+                isDeleted: false
+            }, {
+                balance : balance
+            })
+            return res.status(httpStatus.OK).json({
+                message : 'Transaction deleted successfully',
+                deleteTransaction : deleteTrans
+            })
+        } catch (error) {
+            return res.status(httpStatus.SERVER_ERROR).json({
+                message: 'server error ' + error
+            })
         }
     },
-    //update transaction
+    /**
+     *
+     * @param {Request} req
+     * @param {Response} res
+     * @description update transaction
+     * @route (PATCH /transaction/update)
+     */
     updateTransaction : async (req,res)=> {
-        const user =req.userData.userId;
-        const { amount, description, transactionId } = req.body
-        let findTrans = await Transaction.findOne({id : transactionId, isDeleted : false})
-        if(findTrans){
+        try {
+            const user =req.userData.userId;
+            const {
+                amount,
+                description,
+                transactionId
+            } = req.body;
+            let findTrans = await Transaction.findOne({
+                id : transactionId,
+                isDeleted : false
+            })
+            if(!findTrans) {
+                return res.status(httpStatus.NOT_FOUND).json({
+                    message: 'Transaction id invalid'
+                })
+            }
+
             const findAccount = await sails.helpers.common(findTrans.account,user);
             if(!findAccount) {
-                res.status(304).send('only member and owner can update transaction')
+                return res.status(304).json({
+                    message: 'only member and owner can update transaction'
+                })
+            }
+            let newAmount,newBalance;
+            if(findTrans.transactionType === type.i) {
+                newAmount = amount - findTrans.amount;
             } else {
-                let newAmount,newBalance
-                if(findTrans.transactionType == 'i') {
-                    newAmount = amount - findTrans.amount
-                } else {
-                    newAmount = findTrans.amount - amount
-                }
-                newBalance = findAccount.balance + newAmount
-                if(newBalance > 0) {
-                    let EditTrans = await Transaction.updateOne({ id : transactionId }, { amount : amount, description : description, updatedAt : new Date().getTime(), updatedBy : user})
-                    let EditAcc = await Account.updateOne({ id : findTrans.account }, { balance : newBalance})
-                    res.status(200).json({
-                        message : 'transaction updated successfully',
-                        transaction : EditTrans
-                    })
-                } else {
-                    res.status(300).send('transaction is not updated')
+                if(findTrans.transactionType === type.e) {
+                    newAmount = findTrans.amount - amount;
                 }
             }
-        } else {
-            res.status(404).send('Transaction id is invalid')
+            newBalance = findAccount.balance + newAmount;
+            if(newBalance > 0) {
+                let EditTrans = await Transaction.updateOne({
+                    id : transactionId,
+                    isDeleted: false
+                    }, {
+                    amount : amount,
+                    description : description,
+                    updatedAt : new Date().getTime(),
+                    updatedBy : user
+                })
+                let EditAcc = await Account.updateOne({
+                    id : findTrans.account,
+                    isDeleted: false
+                }, {
+                    balance : newBalance
+                })
+                return res.status(httpStatus.OK).json({
+                    message : 'transaction updated successfully',
+                    transaction : EditTrans,
+                    Account: EditAcc
+                })
+            } else {
+                return res.status(httpStatus.BAD_REQUEST).json({
+                    message: 'transaction is not updated'
+                })
+            }
+        } catch (error) {
+            return res.status(httpStatus.SERVER_ERROR).json({
+                message: 'server error ' + error
+            })
         }
     }
 };

@@ -4,6 +4,9 @@
  * @description :: A model definition represents a database table/collection.
  * @docs        :: https://sailsjs.com/docs/concepts/models-and-orm/models
  */
+let validateData = sails.config.constant.validation.Account;
+let Validator = sails.config.constant.Validator;
+
 module.exports = {
 
   attributes: {
@@ -13,10 +16,11 @@ module.exports = {
       required : true
     },
     user : {
-      model : 'user'
+      model : 'user',
+      required: true
     },
     balance : {
-      type : 'float',
+      type : 'number',
       defaultsTo : 0.0
     },
     users : {
@@ -30,8 +34,29 @@ module.exports = {
     }
   },
 
-  validate : async function(req) {
-    req.check('name').exists().withMessage('name is required')
+  validate : async function(data) {
+    let requiredRules = Object.keys(validateData).filter((key)=> {
+      if(Object.keys(data).indexOf(key)>= 0) {
+        return key
+      }
+    })
+    let rules = {};
+    requiredRules.forEach((val)=> {
+      rules[val] = validateData[val]
+    })
+    let validate = new Validator(data,rules)
+    let result = {}
+    if(validate.passes()){
+      console.log('validate success');
+      result['hasError'] = false
+      return data
+    }
+    if(validate.fails()) {
+      console.log(1);
+      result['hasError'] = true
+      result['error'] = validate.errors.all()
+    }
+    return result
   }
 
 };

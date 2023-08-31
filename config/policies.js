@@ -11,6 +11,7 @@
 module.exports.policies = {
   UserController : {
     logout : 'isAuthorized',
+    profile : 'isAuthorized',
   },
   AccountController : {
      '*' : 'isAuthorized'

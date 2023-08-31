@@ -5,6 +5,7 @@ module.exports =async (req,res,next) =>{
         const token = req.headers.authorization.split(" ")[1];
         const decoded = jwt.verify(token, process.env.JWT_KEY);
         let user = await User.findOne({id : decoded.userId});
+
         if(token == user.token) {
             req.userData = decoded;
             return next();
@@ -15,7 +16,8 @@ module.exports =async (req,res,next) =>{
         }
     } catch(error) {
         return res.status(401).json({
-            message: 'Auth failed'
+            message: 'Auth failed',
+            error: error
         });
     }
 }
